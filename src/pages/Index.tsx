@@ -74,6 +74,7 @@ const Index = () => {
 
     setIsLoading(true);
     
+    console.log('🔍 Buscando informações do vídeo...');
     const response = await getVideoInfo(url);
 
     if (response.success && response.data) {
@@ -82,11 +83,35 @@ const Index = () => {
       
       // Load direct download links
       setIsLoadingLinks(true);
-      const linksResponse = await getDirectDownloadLinks(url);
+      console.log('🔗 Buscando links de download...');
       
-      if (linksResponse.success && linksResponse.data) {
-        setDownloadLinks(linksResponse.data);
+      try {
+        const linksResponse = await getDirectDownloadLinks(url);
+        
+        console.log('📊 Resultado dos links:', linksResponse);
+        
+        if (linksResponse.success && linksResponse.data) {
+          const hasLinks = linksResponse.data.video.length > 0 || linksResponse.data.audio.length > 0;
+          
+          if (hasLinks) {
+            setDownloadLinks(linksResponse.data);
+            toast({ 
+              title: "Links prontos!", 
+              description: `${linksResponse.data.video.length} vídeos e ${linksResponse.data.audio.length} áudios disponíveis.`,
+            });
+          } else {
+            console.log('⚠️ Nenhum link direto disponível, usando modo fallback');
+            setDownloadLinks({ video: [], audio: [] });
+          }
+        } else {
+          console.log('⚠️ Erro ao buscar links, usando modo fallback');
+          setDownloadLinks({ video: [], audio: [] });
+        }
+      } catch (error) {
+        console.error('❌ Erro ao buscar links:', error);
+        setDownloadLinks({ video: [], audio: [] });
       }
+      
       setIsLoadingLinks(false);
     } else {
       setError(response.error || "Não foi possível encontrar o vídeo.");
@@ -113,20 +138,33 @@ const Index = () => {
   };
 
   const handleFallbackDownload = async (quality: string, format: string) => {
-    toast({ 
+    const loadingToast = toast({ 
       title: "Processando...", 
       description: "Obtendo link de download...",
+      duration: 30000, // 30 segundos
     });
+
+    console.log('🎯 Iniciando fallback download:', quality, format);
 
     const response = await downloadWithCobalt(url, quality, format);
     
+    console.log('📊 Resposta do download:', response);
+    
     if (response.success && response.data?.downloadUrl) {
+      loadingToast.dismiss?.();
       handleDirectDownload(response.data.downloadUrl, quality, format);
     } else {
+      loadingToast.dismiss?.();
+      
+      const errorMessage = response.error || "Não foi possível obter o link de download";
+      
+      console.error('❌ Erro no fallback:', errorMessage);
+      
       toast({ 
-        title: "Erro", 
-        description: "Não foi possível obter o link de download. Tente outra qualidade.",
-        variant: "destructive"
+        title: "Erro no download", 
+        description: `${errorMessage}. Tente outra qualidade ou aguarde alguns instantes.`,
+        variant: "destructive",
+        duration: 5000,
       });
     }
   };
@@ -367,6 +405,19 @@ const Index = () => {
                     </>
                   ) : (
                     <>
+                      {/* Info box about fallback mode */}
+                      <div className="glass-card p-4 bg-blue-500/5 border-blue-500/20">
+                        <div className="flex items-start gap-3">
+                          <AlertCircle className="w-5 h-5 text-blue-500 mt-0.5" />
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-foreground">Modo de download sob demanda</p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Os links serão gerados quando você clicar no botão de download. Isso pode levar alguns segundos.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
                       {/* Fallback: Show quality buttons that fetch on click */}
                       <div className="glass-card p-6">
                         <div className="flex items-center gap-3 mb-4">
