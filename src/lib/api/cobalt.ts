@@ -1,7 +1,6 @@
-// Direct download implementation using multiple APIs
+// Download implementation using external services
+// Cobalt v7 API was shut down November 2024
 import { ApiResponse, DownloadInfo } from './youtube';
-
-const COBALT_API_URL = 'https://api.cobalt.tools/api/json';
 
 interface DownloadLink {
   quality: string;
@@ -13,130 +12,16 @@ interface DownloadLink {
 export async function getDirectDownloadLinks(
   url: string
 ): Promise<ApiResponse<{ video: DownloadLink[]; audio: DownloadLink[] }>> {
-  try {
-    // Try to get direct download links from multiple sources
-    const links = await fetchDownloadLinksFromAPIs(url);
-    
-    if (links.video.length > 0 || links.audio.length > 0) {
-      return {
-        success: true,
-        data: links,
-      };
-    }
-
-    throw new Error('No download links available');
-  } catch (error) {
-    console.error('Error getting download links:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to get download links',
-    };
-  }
-}
-
-async function fetchDownloadLinksFromAPIs(url: string): Promise<{ video: DownloadLink[]; audio: DownloadLink[] }> {
-  const videoLinks: DownloadLink[] = [];
-  const audioLinks: DownloadLink[] = [];
-
-  console.log('🔍 Buscando links de download para:', url);
-
-  // Try Cobalt API for video qualities
-  const qualities = ['1080', '720', '480', '360'];
+  console.log('🔍 Gerando opções de download para:', url);
   
-  for (const quality of qualities) {
-    try {
-      console.log(`📹 Tentando buscar qualidade ${quality}p...`);
-      
-      const response = await fetch(COBALT_API_URL, {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          url: url,
-          vQuality: quality,
-          filenamePattern: 'basic',
-          isAudioOnly: false,
-        }),
-      });
-
-      console.log(`📹 Resposta ${quality}p - Status:`, response.status);
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log(`📹 Dados ${quality}p:`, data);
-        
-        if (data.status === 'redirect' && data.url) {
-          videoLinks.push({
-            quality: `${quality}p`,
-            format: 'MP4',
-            url: data.url,
-          });
-          console.log(`✅ Link ${quality}p adicionado!`);
-        } else if (data.status === 'stream' && data.url) {
-          videoLinks.push({
-            quality: `${quality}p`,
-            format: 'MP4',
-            url: data.url,
-          });
-          console.log(`✅ Link ${quality}p (stream) adicionado!`);
-        } else {
-          console.log(`⚠️ Status não esperado para ${quality}p:`, data.status);
-        }
-      } else {
-        console.error(`❌ Erro HTTP ${quality}p:`, response.status);
-      }
-    } catch (e) {
-      console.error(`❌ Erro ao buscar ${quality}p:`, e);
-    }
-  }
-
-  // Try audio format
-  try {
-    console.log('🎵 Tentando buscar áudio MP3...');
-    
-    const response = await fetch(COBALT_API_URL, {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        url: url,
-        filenamePattern: 'basic',
-        isAudioOnly: true,
-        aFormat: 'mp3',
-      }),
-    });
-
-    console.log('🎵 Resposta áudio - Status:', response.status);
-
-    if (response.ok) {
-      const data = await response.json();
-      console.log('🎵 Dados áudio:', data);
-      
-      if ((data.status === 'redirect' || data.status === 'stream') && data.url) {
-        // Add multiple bitrate entries (they all point to the same URL from Cobalt)
-        audioLinks.push(
-          { quality: '320kbps', format: 'MP3', url: data.url },
-          { quality: '192kbps', format: 'MP3', url: data.url },
-          { quality: '128kbps', format: 'MP3', url: data.url }
-        );
-        console.log('✅ Links de áudio adicionados!');
-      } else {
-        console.log('⚠️ Status não esperado para áudio:', data.status);
-      }
-    } else {
-      console.error('❌ Erro HTTP áudio:', response.status);
-    }
-  } catch (e) {
-    console.error('❌ Erro ao buscar áudio:', e);
-  }
-
-  console.log(`📊 Total de links encontrados - Vídeo: ${videoLinks.length}, Áudio: ${audioLinks.length}`);
-
-  return { video: videoLinks, audio: audioLinks };
+  // Return empty arrays to trigger fallback mode with external services
+  return {
+    success: true,
+    data: {
+      video: [],
+      audio: [],
+    },
+  };
 }
 
 export async function downloadWithCobalt(
@@ -144,99 +29,51 @@ export async function downloadWithCobalt(
   quality: string,
   format: string
 ): Promise<ApiResponse<DownloadInfo>> {
-  try {
-    console.log('🚀 Iniciando download:', { url, quality, format });
-    
-    const isAudio = format === 'MP3';
-    const videoQuality = quality.replace('p', '').replace('kbps', '');
-
-    console.log('📤 Enviando requisição para Cobalt API...');
-    
-    const requestBody = {
-      url: url,
-      vQuality: videoQuality,
-      filenamePattern: 'basic',
-      isAudioOnly: isAudio,
-      aFormat: isAudio ? 'mp3' : undefined,
-      disableMetadata: false,
-    };
-    
-    console.log('📦 Body da requisição:', requestBody);
-
-    const response = await fetch(COBALT_API_URL, {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody),
-    });
-
-    console.log('📥 Resposta recebida - Status:', response.status);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('❌ Erro na resposta:', errorText);
-      throw new Error(`API error: ${response.status} - ${errorText}`);
-    }
-
-    const data = await response.json();
-    console.log('📋 Dados recebidos:', data);
-
-    if (data.status === 'redirect' && data.url) {
-      console.log('✅ Link redirect encontrado!');
-      return {
-        success: true,
-        data: {
-          videoId: extractVideoId(url) || '',
-          quality,
-          format,
-          type: isAudio ? 'audio' : 'video',
-          downloadUrl: data.url,
-          message: 'Download pronto!',
-          status: 'ready',
-        },
-      };
-    } else if (data.status === 'stream' && data.url) {
-      console.log('✅ Link stream encontrado!');
-      return {
-        success: true,
-        data: {
-          videoId: extractVideoId(url) || '',
-          quality,
-          format,
-          type: isAudio ? 'audio' : 'video',
-          downloadUrl: data.url,
-          message: 'Download pronto!',
-          status: 'ready',
-        },
-      };
-    } else if (data.status === 'picker' && data.picker && data.picker.length > 0) {
-      console.log('✅ Picker encontrado com', data.picker.length, 'opções');
-      return {
-        success: true,
-        data: {
-          videoId: extractVideoId(url) || '',
-          quality,
-          format,
-          type: isAudio ? 'audio' : 'video',
-          downloadUrl: data.picker[0].url,
-          message: 'Download pronto!',
-          status: 'ready',
-        },
-      };
-    } else if (data.status === 'error') {
-      console.error('❌ API retornou erro:', data.text);
-      throw new Error(data.text || 'Erro ao processar o vídeo');
-    } else {
-      console.error('⚠️ Status desconhecido:', data.status, data);
-      throw new Error(data.text || `Status não suportado: ${data.status}`);
-    }
-  } catch (error) {
-    console.error('❌ Erro no download:', error);
+  console.log('🚀 Gerando link de download:', { url, quality, format });
+  
+  const videoId = extractVideoId(url);
+  if (!videoId) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Falha no download',
+      error: 'URL inválida do YouTube',
+    };
+  }
+
+  try {
+    const isAudio = format === 'MP3';
+    let externalUrl: string;
+    
+    if (isAudio) {
+      // Audio download service
+      externalUrl = `https://ytmp3.nu/IwVJ/?url=${encodeURIComponent(url)}`;
+    } else {
+      // Video download services based on quality
+      if (quality === '1080p' || quality === '720p') {
+        externalUrl = `https://en.savefrom.net/1-youtube-video-downloader-99/#url=${encodeURIComponent(url)}`;
+      } else {
+        externalUrl = `https://www.y2mate.com/download?url=${encodeURIComponent(url)}&q=${quality.replace('p', '')}`;
+      }
+    }
+
+    console.log('✅ Link gerado:', externalUrl);
+
+    return {
+      success: true,
+      data: {
+        videoId,
+        quality,
+        format,
+        type: isAudio ? 'audio' : 'video',
+        downloadUrl: externalUrl,
+        message: 'Abrindo serviço de download...',
+        status: 'redirect',
+      },
+    };
+  } catch (error) {
+    console.error('❌ Erro ao gerar link:', error);
+    return {
+      success: false,
+      error: 'Não foi possível gerar o link de download',
     };
   }
 }

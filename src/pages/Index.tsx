@@ -138,31 +138,55 @@ const Index = () => {
   };
 
   const handleFallbackDownload = async (quality: string, format: string) => {
-    const loadingToast = toast({ 
-      title: "Processando...", 
-      description: "Obtendo link de download...",
-      duration: 30000, // 30 segundos
+    const toastId = Date.now().toString();
+    
+    toast({ 
+      id: toastId,
+      title: "⏳ Processando...", 
+      description: "Obtendo link de download. Isso pode levar até 30 segundos...",
+      duration: 60000, // 60 segundos
     });
 
     console.log('🎯 Iniciando fallback download:', quality, format);
 
-    const response = await downloadWithCobalt(url, quality, format);
-    
-    console.log('📊 Resposta do download:', response);
-    
-    if (response.success && response.data?.downloadUrl) {
-      loadingToast.dismiss?.();
-      handleDirectDownload(response.data.downloadUrl, quality, format);
-    } else {
-      loadingToast.dismiss?.();
+    try {
+      const response = await downloadWithCobalt(url, quality, format);
       
-      const errorMessage = response.error || "Não foi possível obter o link de download";
+      console.log('📊 Resposta do download:', response);
       
-      console.error('❌ Erro no fallback:', errorMessage);
-      
+      if (response.success && response.data?.downloadUrl) {
+        toast({ 
+          title: "✅ Link obtido!", 
+          description: "Iniciando download...",
+          duration: 3000,
+        });
+        
+        handleDirectDownload(response.data.downloadUrl, quality, format);
+      } else {
+        const errorMessage = response.error || "Não foi possível obter o link de download";
+        
+        console.error('❌ Erro no fallback:', errorMessage);
+        
+        // Show error with retry button
+        toast({ 
+          title: "❌ Erro no download", 
+          description: (
+            <div className="space-y-2">
+              <p className="text-sm">{errorMessage}</p>
+              <p className="text-xs text-muted-foreground">
+                Possíveis causas: vídeo com restrições, API temporariamente indisponível, ou vídeo muito recente.
+              </p>
+            </div>
+          ),
+          variant: "destructive",
+          duration: 10000,
+        });
+      }
+    } catch (error) {
+      console.error('❌ Erro inesperado:', error);
       toast({ 
-        title: "Erro no download", 
-        description: `${errorMessage}. Tente outra qualidade ou aguarde alguns instantes.`,
+        title: "❌ Erro inesperado", 
+        description: "Ocorreu um erro ao processar sua solicitação. Tente novamente.",
         variant: "destructive",
         duration: 5000,
       });
@@ -406,14 +430,29 @@ const Index = () => {
                   ) : (
                     <>
                       {/* Info box about fallback mode */}
-                      <div className="glass-card p-4 bg-blue-500/5 border-blue-500/20">
+                      <div className="glass-card p-4 bg-amber-500/5 border-amber-500/20">
                         <div className="flex items-start gap-3">
-                          <AlertCircle className="w-5 h-5 text-blue-500 mt-0.5" />
+                          <AlertCircle className="w-5 h-5 text-amber-500 mt-0.5" />
                           <div className="flex-1">
-                            <p className="text-sm font-medium text-foreground">Modo de download sob demanda</p>
+                            <p className="text-sm font-medium text-foreground">Modo de download sob demanda ativo</p>
                             <p className="text-xs text-muted-foreground mt-1">
-                              Os links serão gerados quando você clicar no botão de download. Isso pode levar alguns segundos.
+                              Não foi possível carregar os links diretos. Clique no botão desejado e aguardaremos alguns segundos para gerar seu link de download.
                             </p>
+                            <button
+                              onClick={() => {
+                                setIsLoadingLinks(true);
+                                getDirectDownloadLinks(url).then(response => {
+                                  if (response.success && response.data) {
+                                    setDownloadLinks(response.data);
+                                    toast({ title: "✅ Links carregados!", description: "Agora você pode baixar diretamente." });
+                                  }
+                                  setIsLoadingLinks(false);
+                                });
+                              }}
+                              className="mt-2 text-xs text-amber-600 hover:text-amber-700 font-medium underline underline-offset-2"
+                            >
+                              Tentar carregar links novamente →
+                            </button>
                           </div>
                         </div>
                       </div>
