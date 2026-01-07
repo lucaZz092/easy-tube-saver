@@ -14,12 +14,63 @@ export async function getDirectDownloadLinks(
 ): Promise<ApiResponse<{ video: DownloadLink[]; audio: DownloadLink[] }>> {
   console.log('🔍 Gerando opções de download para:', url);
   
-  // Return empty arrays to trigger fallback mode with external services
+  const videoId = extractVideoId(url);
+  if (!videoId) {
+    return {
+      success: false,
+      error: 'URL inválida do YouTube',
+    };
+  }
+
+  // Generate direct download links using various services
+  const videoLinks: DownloadLink[] = [
+    {
+      quality: '1080p',
+      format: 'MP4',
+      url: `https://en.savefrom.net/download?url=${encodeURIComponent(url)}`,
+    },
+    {
+      quality: '720p',
+      format: 'MP4',
+      url: `https://en.savefrom.net/download?url=${encodeURIComponent(url)}`,
+    },
+    {
+      quality: '480p',
+      format: 'MP4',
+      url: `https://www.y2mate.com/youtube/${videoId}`,
+    },
+    {
+      quality: '360p',
+      format: 'MP4',
+      url: `https://www.y2mate.com/youtube/${videoId}`,
+    },
+  ];
+
+  const audioLinks: DownloadLink[] = [
+    {
+      quality: '320kbps',
+      format: 'MP3',
+      url: `https://ytmp3.nu/${videoId}`,
+    },
+    {
+      quality: '192kbps',
+      format: 'MP3',
+      url: `https://ytmp3.nu/${videoId}`,
+    },
+    {
+      quality: '128kbps',
+      format: 'MP3',
+      url: `https://www.y2mate.com/youtube/${videoId}`,
+    },
+  ];
+
+  console.log('✅ Links gerados:', { video: videoLinks.length, audio: audioLinks.length });
+
   return {
     success: true,
     data: {
-      video: [],
-      audio: [],
+      video: videoLinks,
+      audio: audioLinks,
     },
   };
 }
