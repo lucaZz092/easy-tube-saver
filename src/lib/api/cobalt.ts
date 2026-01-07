@@ -12,7 +12,7 @@ interface DownloadLink {
 export async function getDirectDownloadLinks(
   url: string
 ): Promise<ApiResponse<{ video: DownloadLink[]; audio: DownloadLink[] }>> {
-  console.log('🔍 Gerando opções de download para:', url);
+  console.log('🔍 Buscando links de download reais...');
   
   const videoId = extractVideoId(url);
   if (!videoId) {
@@ -22,57 +22,93 @@ export async function getDirectDownloadLinks(
     };
   }
 
-  // Generate direct download links using various services
-  const videoLinks: DownloadLink[] = [
-    {
-      quality: '1080p',
-      format: 'MP4',
-      url: `https://en.savefrom.net/download?url=${encodeURIComponent(url)}`,
-    },
-    {
-      quality: '720p',
-      format: 'MP4',
-      url: `https://en.savefrom.net/download?url=${encodeURIComponent(url)}`,
-    },
-    {
-      quality: '480p',
-      format: 'MP4',
-      url: `https://www.y2mate.com/youtube/${videoId}`,
-    },
-    {
-      quality: '360p',
-      format: 'MP4',
-      url: `https://www.y2mate.com/youtube/${videoId}`,
-    },
-  ];
+  try {
+    // Use ytdl API to get real download links
+    const apiUrl = `https://api.ytdl.org/api/get?url=${encodeURIComponent(url)}`;
+    
+    console.log('🌐 Consultando API ytdl...');
+    const response = await fetch(apiUrl);
+    
+    if (!response.ok) {
+      throw new Error('API não disponível');
+    }
 
-  const audioLinks: DownloadLink[] = [
-    {
-      quality: '320kbps',
-      format: 'MP3',
-      url: `https://ytmp3.nu/${videoId}`,
-    },
-    {
-      quality: '192kbps',
-      format: 'MP3',
-      url: `https://ytmp3.nu/${videoId}`,
-    },
-    {
-      quality: '128kbps',
-      format: 'MP3',
-      url: `https://www.y2mate.com/youtube/${videoId}`,
-    },
-  ];
+    const data = await response.json();
+    console.log('📊 Resposta da API:', data);
 
-  console.log('✅ Links gerados:', { video: videoLinks.length, audio: audioLinks.length });
+    const videoLinks: DownloadLink[] = [];
+    const audioLinks: DownloadLink[] = [];
 
-  return {
-    success: true,
-    data: {
-      video: videoLinks,
-      audio: audioLinks,
-    },
-  };
+    // Parse video formats
+    if (data.formats && Array.isArray(data.formats)) {
+      // Filter video formats with audio
+      const videoFormats = data.formats.filter((f: any) => 
+        f.mimeType?.includes('video') && f.hasAudio
+      );
+
+      // Add video options
+      if (videoFormats.length > 0) {
+        const qualities = ['1080p', '720p', '480p', '360p'];
+        qualities.forEach(quality => {
+          const format = videoFormats.find((f: any) => f.qualityLabel === quality);
+          if (format && format.url) {
+            videoLinks.push({
+              quality,
+              format: 'MP4',
+              url: format.url,
+            });
+          }
+        });
+      }
+
+      // Filter audio formats
+      const audioFormats = data.formats.filter((f: any) => 
+        f.mimeType?.includes('audio')
+      );
+
+      // Add audio options
+      if (audioFormats.length > 0) {
+        audioLinks.push(
+          {
+            quality: '320kbps',
+            format: 'MP3',
+            url: audioFormats[0]?.url || '',
+          },
+          {
+            quality: '192kbps',
+            format: 'MP3',
+            url: audioFormats[0]?.url || '',
+          },
+          {
+            quality: '128kbps',
+            format: 'MP3',
+            url: audioFormats[0]?.url || '',
+          }
+        );
+      }
+    }
+
+    console.log('✅ Links encontrados:', { video: videoLinks.length, audio: audioLinks.length });
+
+    return {
+      success: true,
+      data: {
+        video: videoLinks,
+        audio: audioLinks,
+      },
+    };
+  } catch (error) {
+    console.error('❌ Erro ao buscar links:', error);
+    
+    // Fallback: return empty to trigger fallback mode
+    return {
+      success: true,
+      data: {
+        video: [],
+        audio: [],
+      },
+    };
+  }
 }
 
 export async function downloadWithCobalt(
