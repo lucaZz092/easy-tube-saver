@@ -1,54 +1,50 @@
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Download, Music, Zap, Shield, Clock, Smartphone } from "lucide-react";
-import Header from "@/components/Header";
-import HeroSection from "@/components/HeroSection";
-import UrlInput from "@/components/UrlInput";
-import VideoPreview from "@/components/VideoPreview";
-import DownloadOptions from "@/components/DownloadOptions";
-import FeatureCard from "@/components/FeatureCard";
-import BackgroundEffects from "@/components/BackgroundEffects";
+import { Download, Music, Zap, Shield, Clock, Smartphone, Link, Clipboard, Loader2, Play, Eye } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 
 const features = [
   {
     icon: Download,
     title: "Múltiplas Qualidades",
-    description:
-      "Baixe em 1080p, 720p, 480p ou 360p. Escolha a qualidade ideal para você.",
+    description: "Baixe em 1080p, 720p, 480p ou 360p. Escolha a qualidade ideal para você.",
   },
   {
     icon: Music,
     title: "Extração de Áudio",
-    description:
-      "Converta vídeos para MP3 em alta qualidade (320kbps ou 128kbps).",
+    description: "Converta vídeos para MP3 em alta qualidade (320kbps ou 128kbps).",
   },
   {
     icon: Zap,
     title: "Super Rápido",
-    description:
-      "Servidores otimizados para downloads extremamente rápidos.",
+    description: "Servidores otimizados para downloads extremamente rápidos.",
   },
   {
     icon: Shield,
     title: "100% Seguro",
-    description:
-      "Sem vírus, malware ou anúncios invasivos. Sua segurança é prioridade.",
+    description: "Sem vírus, malware ou anúncios invasivos. Sua segurança é prioridade.",
   },
   {
     icon: Clock,
     title: "Sem Limites",
-    description:
-      "Baixe quantos vídeos quiser, sem restrições ou tempo de espera.",
+    description: "Baixe quantos vídeos quiser, sem restrições ou tempo de espera.",
   },
   {
     icon: Smartphone,
     title: "Funciona em Tudo",
-    description:
-      "Use em qualquer dispositivo: computador, tablet ou celular.",
+    description: "Use em qualquer dispositivo: computador, tablet ou celular.",
   },
 ];
 
-// Helper to extract video ID from YouTube URL
+const downloadOptions = [
+  { quality: "1080p", format: "MP4", size: "~250 MB", type: "video" },
+  { quality: "720p", format: "MP4", size: "~150 MB", type: "video" },
+  { quality: "480p", format: "MP4", size: "~80 MB", type: "video" },
+  { quality: "360p", format: "MP4", size: "~40 MB", type: "video" },
+  { quality: "320kbps", format: "MP3", size: "~10 MB", type: "audio" },
+  { quality: "128kbps", format: "MP3", size: "~4 MB", type: "audio" },
+];
+
 const extractVideoId = (url: string): string | null => {
   const patterns = [
     /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
@@ -61,6 +57,7 @@ const extractVideoId = (url: string): string | null => {
 };
 
 const Index = () => {
+  const [url, setUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [videoData, setVideoData] = useState<{
     id: string;
@@ -69,15 +66,30 @@ const Index = () => {
     duration?: string;
     views?: string;
   } | null>(null);
+  const { toast } = useToast();
 
-  const handleUrlSubmit = async (url: string) => {
+  const handlePaste = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      setUrl(text);
+      toast({ title: "Link colado!", description: "O link foi colado com sucesso." });
+    } catch {
+      toast({ title: "Erro ao colar", description: "Não foi possível acessar a área de transferência.", variant: "destructive" });
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!url.includes("youtube.com") && !url.includes("youtu.be")) {
+      toast({ title: "Link inválido", description: "Por favor, insira um link válido do YouTube.", variant: "destructive" });
+      return;
+    }
+
     setIsLoading(true);
     const videoId = extractVideoId(url);
 
     if (videoId) {
-      // Simulating API call - in real implementation, you'd fetch video info
       await new Promise((resolve) => setTimeout(resolve, 1500));
-
       setVideoData({
         id: videoId,
         title: "Vídeo do YouTube",
@@ -86,135 +98,252 @@ const Index = () => {
         views: "1.2M",
       });
     }
-
     setIsLoading(false);
+  };
+
+  const handleDownload = (quality: string, format: string) => {
+    toast({ title: "Download iniciado!", description: `Preparando ${format} ${quality}...` });
   };
 
   const handleReset = () => {
     setVideoData(null);
+    setUrl("");
   };
 
   return (
-    <div className="min-h-screen bg-background relative">
-      <BackgroundEffects />
+    <div className="min-h-screen bg-background relative overflow-hidden">
+      {/* Background Effects */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+        <div
+          className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] rounded-full opacity-100"
+          style={{
+            background: "radial-gradient(ellipse at center, hsla(0, 84%, 60%, 0.15) 0%, hsla(16, 100%, 60%, 0.05) 40%, transparent 70%)",
+          }}
+        />
+        <div
+          className="absolute bottom-0 right-0 w-[600px] h-[600px] rounded-full animate-float opacity-50"
+          style={{
+            background: "radial-gradient(ellipse at center, hsla(16, 100%, 60%, 0.1) 0%, transparent 60%)",
+          }}
+        />
+      </div>
 
       <div className="relative z-10">
-        <Header />
+        {/* Header */}
+        <header className="w-full py-6 px-4">
+          <div className="max-w-7xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+                  <Play className="w-5 h-5 text-primary-foreground fill-current" />
+                </div>
+                <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-accent flex items-center justify-center">
+                  <Zap className="w-2.5 h-2.5 text-accent-foreground fill-current" />
+                </div>
+              </div>
+              <div>
+                <h1 className="font-display font-bold text-xl text-foreground">TubeDown</h1>
+                <p className="text-xs text-muted-foreground">Download rápido e fácil</p>
+              </div>
+            </div>
+            <nav className="hidden md:flex items-center gap-6">
+              <a href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Recursos</a>
+              <a href="#faq" className="text-sm text-muted-foreground hover:text-foreground transition-colors">FAQ</a>
+            </nav>
+          </div>
+        </header>
 
         <main className="px-4 py-12 md:py-20">
           <div className="max-w-7xl mx-auto">
-            <HeroSection />
+            {/* Hero Section */}
+            <div className="text-center max-w-4xl mx-auto mb-12">
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-6">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+                </span>
+                <span className="text-sm text-primary font-medium">100% Grátis • Sem Limites</span>
+              </div>
 
-            <div className="mb-16">
-              <UrlInput onSubmit={handleUrlSubmit} isLoading={isLoading} />
+              <h1 className="font-display text-4xl md:text-6xl lg:text-7xl font-bold text-foreground mb-6 leading-tight">
+                Baixe vídeos do <span className="gradient-text">YouTube</span>
+                <br />
+                em segundos
+              </h1>
+
+              <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
+                Converta e baixe vídeos em todas as qualidades, extraia áudio para MP3 e muito mais. Rápido, seguro e sem cadastro.
+              </p>
             </div>
 
-            <AnimatePresence mode="wait">
-              {videoData && (
-                <motion.div
-                  key="video-results"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  className="space-y-8 mb-20"
-                >
-                  <VideoPreview
-                    videoId={videoData.id}
-                    title={videoData.title}
-                    thumbnail={videoData.thumbnail}
-                    duration={videoData.duration}
-                    views={videoData.views}
+            {/* URL Input */}
+            <form onSubmit={handleSubmit} className="w-full max-w-3xl mx-auto mb-16">
+              <div className="glass-card p-2 flex items-center gap-2">
+                <div className="flex-1 flex items-center gap-3 px-4">
+                  <Link className="w-5 h-5 text-muted-foreground" />
+                  <input
+                    type="url"
+                    value={url}
+                    onChange={(e) => setUrl(e.target.value)}
+                    placeholder="Cole o link do vídeo do YouTube aqui..."
+                    className="flex-1 bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground py-4 text-base"
                   />
-                  <DownloadOptions videoId={videoData.id} />
+                </div>
+                <Button type="button" variant="glass" size="icon" onClick={handlePaste} className="shrink-0">
+                  <Clipboard className="w-4 h-4" />
+                </Button>
+                <Button type="submit" variant="hero" size="lg" disabled={!url || isLoading} className="shrink-0">
+                  {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Buscar"}
+                </Button>
+              </div>
+            </form>
+
+            {/* Video Preview & Download Options */}
+            {videoData && (
+              <div className="space-y-8 mb-20">
+                {/* Video Preview */}
+                <div className="glass-card overflow-hidden max-w-2xl mx-auto">
+                  <div className="relative group">
+                    <img src={videoData.thumbnail} alt={videoData.title} className="w-full aspect-video object-cover" />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <div className="w-16 h-16 rounded-full bg-primary/90 flex items-center justify-center">
+                        <Play className="w-8 h-8 text-primary-foreground fill-current ml-1" />
+                      </div>
+                    </div>
+                    {videoData.duration && (
+                      <div className="absolute bottom-3 right-3 bg-black/80 px-2 py-1 rounded text-xs font-medium text-white flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {videoData.duration}
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-5">
+                    <h3 className="font-display font-semibold text-lg text-foreground line-clamp-2 mb-2">{videoData.title}</h3>
+                    {videoData.views && (
+                      <div className="flex items-center gap-1 text-muted-foreground text-sm">
+                        <Eye className="w-4 h-4" />
+                        <span>{videoData.views} visualizações</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Download Options */}
+                <div className="w-full max-w-2xl mx-auto space-y-6">
+                  {/* Video Options */}
+                  <div className="glass-card p-6">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
+                        <Download className="w-5 h-5 text-primary" />
+                      </div>
+                      <div>
+                        <h3 className="font-display font-semibold text-lg text-foreground">Vídeo</h3>
+                        <p className="text-sm text-muted-foreground">Download com áudio incluso</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      {downloadOptions.filter((o) => o.type === "video").map((option) => (
+                        <Button
+                          key={option.quality}
+                          variant="glass"
+                          onClick={() => handleDownload(option.quality, option.format)}
+                          className="w-full h-auto py-4 flex-col gap-1 hover:border-primary/50"
+                        >
+                          <span className="text-lg font-bold text-foreground">{option.quality}</span>
+                          <span className="text-xs text-muted-foreground">{option.format} • {option.size}</span>
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Audio Options */}
+                  <div className="glass-card p-6">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 rounded-xl bg-accent/20 flex items-center justify-center">
+                        <Music className="w-5 h-5 text-accent" />
+                      </div>
+                      <div>
+                        <h3 className="font-display font-semibold text-lg text-foreground">Áudio</h3>
+                        <p className="text-sm text-muted-foreground">Extrair apenas o áudio</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      {downloadOptions.filter((o) => o.type === "audio").map((option) => (
+                        <Button
+                          key={option.quality}
+                          variant="glass"
+                          onClick={() => handleDownload(option.quality, option.format)}
+                          className="w-full h-auto py-4 flex-col gap-1 hover:border-accent/50"
+                        >
+                          <span className="text-lg font-bold text-foreground">{option.quality}</span>
+                          <span className="text-xs text-muted-foreground">{option.format} • {option.size}</span>
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Quick Actions */}
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <Button variant="hero" size="xl" onClick={() => handleDownload("1080p", "MP4")} className="flex-1">
+                      <Download className="w-5 h-5" />
+                      Melhor Qualidade (1080p)
+                    </Button>
+                    <Button variant="glass" size="xl" onClick={() => handleDownload("320kbps", "MP3")} className="flex-1">
+                      <Music className="w-5 h-5" />
+                      Extrair MP3
+                    </Button>
+                  </div>
 
                   <div className="text-center">
-                    <button
-                      onClick={handleReset}
-                      className="text-sm text-muted-foreground hover:text-foreground transition-colors underline underline-offset-4"
-                    >
+                    <button onClick={handleReset} className="text-sm text-muted-foreground hover:text-foreground transition-colors underline underline-offset-4">
                       Baixar outro vídeo
                     </button>
                   </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                </div>
+              </div>
+            )}
 
             {/* Features Section */}
             <section id="features" className="py-16">
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                className="text-center mb-12"
-              >
+              <div className="text-center mb-12">
                 <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4">
-                  Por que usar o{" "}
-                  <span className="gradient-text">TubeDown</span>?
+                  Por que usar o <span className="gradient-text">TubeDown</span>?
                 </h2>
                 <p className="text-muted-foreground max-w-xl mx-auto">
-                  A melhor ferramenta para baixar vídeos do YouTube com
-                  facilidade e segurança.
+                  A melhor ferramenta para baixar vídeos do YouTube com facilidade e segurança.
                 </p>
-              </motion.div>
+              </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {features.map((feature, index) => (
-                  <FeatureCard
-                    key={feature.title}
-                    icon={feature.icon}
-                    title={feature.title}
-                    description={feature.description}
-                    index={index}
-                  />
+                {features.map((feature) => (
+                  <div key={feature.title} className="glass-card p-6 group cursor-pointer hover:-translate-y-1 transition-transform duration-300">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+                      <feature.icon className="w-6 h-6 text-primary group-hover:text-accent transition-colors duration-300" />
+                    </div>
+                    <h3 className="font-display font-semibold text-lg text-foreground mb-2">{feature.title}</h3>
+                    <p className="text-muted-foreground text-sm leading-relaxed">{feature.description}</p>
+                  </div>
                 ))}
               </div>
             </section>
 
             {/* FAQ Section */}
             <section id="faq" className="py-16">
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                className="text-center mb-12"
-              >
-                <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4">
-                  Perguntas Frequentes
-                </h2>
-              </motion.div>
+              <div className="text-center mb-12">
+                <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4">Perguntas Frequentes</h2>
+              </div>
 
               <div className="max-w-2xl mx-auto space-y-4">
                 {[
-                  {
-                    q: "É grátis mesmo?",
-                    a: "Sim! O TubeDown é 100% gratuito, sem limites de downloads ou recursos pagos.",
-                  },
-                  {
-                    q: "Qual a qualidade máxima disponível?",
-                    a: "Você pode baixar vídeos em até 1080p (Full HD) e áudios em 320kbps.",
-                  },
-                  {
-                    q: "Funciona no celular?",
-                    a: "Sim! O site é totalmente responsivo e funciona em qualquer dispositivo.",
-                  },
-                  {
-                    q: "É seguro usar?",
-                    a: "Completamente seguro. Não armazenamos dados e não há riscos de vírus.",
-                  },
+                  { q: "É grátis mesmo?", a: "Sim! O TubeDown é 100% gratuito, sem limites de downloads ou recursos pagos." },
+                  { q: "Qual a qualidade máxima disponível?", a: "Você pode baixar vídeos em até 1080p (Full HD) e áudios em 320kbps." },
+                  { q: "Funciona no celular?", a: "Sim! O site é totalmente responsivo e funciona em qualquer dispositivo." },
+                  { q: "É seguro usar?", a: "Completamente seguro. Não armazenamos dados e não há riscos de vírus." },
                 ].map((faq, index) => (
-                  <motion.div
-                    key={index}
-                    initial={{ opacity: 0, y: 10 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: index * 0.1 }}
-                    className="glass-card p-6"
-                  >
-                    <h3 className="font-display font-semibold text-foreground mb-2">
-                      {faq.q}
-                    </h3>
+                  <div key={index} className="glass-card p-6">
+                    <h3 className="font-display font-semibold text-foreground mb-2">{faq.q}</h3>
                     <p className="text-muted-foreground text-sm">{faq.a}</p>
-                  </motion.div>
+                  </div>
                 ))}
               </div>
             </section>
@@ -224,12 +353,8 @@ const Index = () => {
         {/* Footer */}
         <footer className="border-t border-border py-8 px-4">
           <div className="max-w-7xl mx-auto text-center">
-            <p className="text-sm text-muted-foreground">
-              © 2024 TubeDown. Ferramenta gratuita para download de vídeos.
-            </p>
-            <p className="text-xs text-muted-foreground/60 mt-2">
-              Respeite os direitos autorais. Baixe apenas conteúdo permitido.
-            </p>
+            <p className="text-sm text-muted-foreground">© 2024 TubeDown. Ferramenta gratuita para download de vídeos.</p>
+            <p className="text-xs text-muted-foreground/60 mt-2">Respeite os direitos autorais. Baixe apenas conteúdo permitido.</p>
           </div>
         </footer>
       </div>
