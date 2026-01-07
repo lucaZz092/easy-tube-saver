@@ -1,21 +1,43 @@
 # Easy Tube Saver
 
-YouTube Video Downloader - Baixe vídeos e áudios do YouTube de forma fácil e rápida.
+YouTube Video Downloader - Baixe vídeos e áudios do YouTube de forma fácil e rápida, **diretamente do site**.
 
 ## 🚀 Funcionalidades
 
+- ✅ **Download DIRETO** - Links de download aparecem no próprio site (como SaveFrom)
 - ✅ Download de vídeos em múltiplas qualidades (1080p, 720p, 480p, 360p)
 - ✅ Extração de áudio para MP3 (320kbps, 192kbps, 128kbps)
 - ✅ Interface moderna e responsiva
 - ✅ Sem necessidade de cadastro
 - ✅ Totalmente gratuito
+- ✅ Sem redirecionamentos para sites externos
+
+## 🎯 Como Funciona
+
+1. **Cole o link** do vídeo do YouTube
+2. **Clique em "Buscar"** - o sistema carrega as informações do vídeo
+3. **Veja os links de download** aparecerem automaticamente
+4. **Clique no botão de download** da qualidade desejada
+5. **O arquivo baixa direto** no seu computador!
+
+> **Diferente de outros sites**, você NÃO é redirecionado para outras páginas. Tudo acontece aqui!
 
 ## 🛠️ Tecnologias
 
 - **Frontend:** React + TypeScript + Vite
 - **UI:** Tailwind CSS + shadcn/ui
 - **Backend:** Supabase Edge Functions
-- **Download:** Integração com cobalt.tools API
+- **Download:** Cobalt Tools API (download direto)
+- **Fallback:** Sistema inteligente de recuperação
+
+## 💡 Diferenciais
+
+### ✨ Download Direto no Site
+Diferente da maioria dos sites de download de YouTube:
+- ❌ **Outros sites:** Redirecionam você para outras páginas cheias de anúncios
+- ✅ **Easy Tube Saver:** Mostra os links de download diretamente no site
+- ✅ **Experiência limpa:** Sem popups, sem redirecionamentos
+- ✅ **Mais rápido:** Um clique e pronto!
 
 ## 📦 Instalação
 
@@ -80,11 +102,25 @@ Veja [server/README.md](server/README.md) para mais detalhes.
 
 ## 📝 Como Usar
 
-1. Cole o link do vídeo do YouTube no campo de busca
-2. Clique em "Buscar" para carregar as informações do vídeo
-3. Escolha a qualidade desejada (vídeo ou áudio)
-4. Clique no botão de download
-5. O arquivo será baixado automaticamente
+1. **Cole o link** do vídeo do YouTube no campo de busca
+2. **Clique em "Buscar"** para carregar as informações do vídeo
+3. **Aguarde** enquanto o sistema busca os links de download disponíveis
+4. **Escolha a qualidade** desejada na lista que aparece
+5. **Clique no botão de download** e o arquivo será baixado automaticamente
+
+### 🎬 Exemplo de Uso
+
+```
+1. Copie: https://www.youtube.com/watch?v=dQw4w9WgXcQ
+2. Cole no campo
+3. Clique em "Buscar"
+4. Veja os links aparecerem:
+   - 1080p MP4 [Baixar] ⬇️
+   - 720p MP4 [Baixar] ⬇️
+   - 480p MP4 [Baixar] ⬇️
+   - 320kbps MP3 [Baixar] ⬇️
+5. Clique no que você quer e pronto!
+```
 
 ## 🔒 Privacidade e Segurança
 

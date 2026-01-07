@@ -2,9 +2,8 @@ import { useState } from "react";
 import { Download, Music, Zap, Shield, Clock, Smartphone, Link, Clipboard, Loader2, Play, Eye, AlertCircle, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { getVideoInfo, requestDownload, isValidYouTubeUrl, VideoInfo, DownloadOption } from "@/lib/api/youtube";
-import { downloadWithCobalt, getDownloadFallback, getAllFallbackServices } from "@/lib/api/cobalt";
-import { DownloadFallbackDialog } from "@/components/DownloadFallbackDialog";
+import { getVideoInfo, isValidYouTubeUrl, VideoInfo, DownloadOption } from "@/lib/api/youtube";
+import { getDirectDownloadLinks, downloadWithCobalt } from "@/lib/api/cobalt";
 
 const features = [
   {
@@ -42,11 +41,13 @@ const features = [
 const Index = () => {
   const [url, setUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
   const [videoData, setVideoData] = useState<VideoInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [showFallbackDialog, setShowFallbackDialog] = useState(false);
-  const [fallbackServices, setFallbackServices] = useState<Array<{ name: string; url: string }>>([]);
+  const [downloadLinks, setDownloadLinks] = useState<{
+    video: Array<{ quality: string; format: string; url: string }>;
+    audio: Array<{ quality: string; format: string; url: string }>;
+  } | null>(null);
+  const [isLoadingLinks, setIsLoadingLinks] = useState(false);
   const { toast } = useToast();
 
   const handlePaste = async () => {
@@ -63,6 +64,7 @@ const Index = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setDownloadLinks(null);
     
     if (!isValidYouTubeUrl(url)) {
       setError("Por favor, insira um link válido do YouTube.");
@@ -77,6 +79,15 @@ const Index = () => {
     if (response.success && response.data) {
       setVideoData(response.data);
       toast({ title: "Vídeo encontrado!", description: response.data.title });
+      
+      // Load direct download links
+      setIsLoadingLinks(true);
+      const linksResponse = await getDirectDownloadLinks(url);
+      
+      if (linksResponse.success && linksResponse.data) {
+        setDownloadLinks(linksResponse.data);
+      }
+      setIsLoadingLinks(false);
     } else {
       setError(response.error || "Não foi possível encontrar o vídeo.");
       toast({ title: "Erro", description: response.error || "Não foi possível encontrar o vídeo.", variant: "destructive" });
@@ -85,61 +96,44 @@ const Index = () => {
     setIsLoading(false);
   };
 
-  const handleDownload = async (quality: string, format: string) => {
-    if (!videoData) return;
+  const handleDirectDownload = (downloadUrl: string, quality: string, format: string) => {
+    // Create a temporary link and trigger download
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = `video_${quality}.${format.toLowerCase()}`;
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
     
-    setIsDownloading(true);
-    
-    try {
-      // Try cobalt.tools API first
-      const cobaltResponse = await downloadWithCobalt(url, quality, format);
-      
-      if (cobaltResponse.success && cobaltResponse.data?.downloadUrl) {
-        // Direct download available
-        toast({ 
-          title: "Download iniciado!", 
-          description: "O download será aberto em uma nova aba.",
-        });
-        
-        // Open download in new tab
-        window.open(cobaltResponse.data.downloadUrl, '_blank');
-      } else {
-        // Fallback to external services - show dialog with options
-        const isAudio = format === 'MP3';
-        const services = getAllFallbackServices(url, isAudio);
-        
-        setFallbackServices(services);
-        setShowFallbackDialog(true);
-      }
-    } catch (error) {
-      console.error('Download error:', error);
-      
-      // Show fallback options on error
-      const isAudio = format === 'MP3';
-      const services = getAllFallbackServices(url, isAudio);
-      
-      setFallbackServices(services);
-      setShowFallbackDialog(true);
-      
-      toast({ 
-        title: "Usando serviço alternativo", 
-        description: "Escolha um dos serviços disponíveis para fazer o download.",
-      });
-    }
-    
-    setIsDownloading(false);
+    toast({ 
+      title: "Download iniciado!", 
+      description: `Baixando ${format} ${quality}...`,
+    });
   };
 
-  const handleSelectFallbackService = (serviceUrl: string) => {
-    window.open(serviceUrl, '_blank');
+  const handleFallbackDownload = async (quality: string, format: string) => {
     toast({ 
-      title: "Redirecionado!", 
-      description: "Siga as instruções na página para completar o download.",
+      title: "Processando...", 
+      description: "Obtendo link de download...",
     });
+
+    const response = await downloadWithCobalt(url, quality, format);
+    
+    if (response.success && response.data?.downloadUrl) {
+      handleDirectDownload(response.data.downloadUrl, quality, format);
+    } else {
+      toast({ 
+        title: "Erro", 
+        description: "Não foi possível obter o link de download. Tente outra qualidade.",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleReset = () => {
     setVideoData(null);
+    setDownloadLinks(null);
     setUrl("");
     setError(null);
   };
@@ -288,91 +282,143 @@ const Index = () => {
 
                 {/* Download Options */}
                 <div className="w-full max-w-2xl mx-auto space-y-6">
-                  {/* Video Options */}
-                  <div className="glass-card p-6">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
-                        <Download className="w-5 h-5 text-primary" />
-                      </div>
-                      <div>
-                        <h3 className="font-display font-semibold text-lg text-foreground">Vídeo</h3>
-                        <p className="text-sm text-muted-foreground">Download com áudio incluso</p>
-                      </div>
+                  {isLoadingLinks ? (
+                    <div className="glass-card p-12 text-center">
+                      <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4 text-primary" />
+                      <p className="text-muted-foreground">Carregando opções de download...</p>
                     </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      {videoData.downloadOptions.video.map((option: DownloadOption) => (
-                        <Button
-                          key={option.quality}
-                          variant="glass"
-                          onClick={() => handleDownload(option.quality, option.format)}
-                          disabled={isDownloading}
-                          className="w-full h-auto py-4 flex-col gap-1 hover:border-primary/50"
-                        >
-                          <span className="text-lg font-bold text-foreground">{option.quality}</span>
-                          <span className="text-xs text-muted-foreground">{option.format} • {option.estimatedSize}</span>
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Audio Options */}
-                  <div className="glass-card p-6">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 rounded-xl bg-accent/20 flex items-center justify-center">
-                        <Music className="w-5 h-5 text-accent" />
-                      </div>
-                      <div>
-                        <h3 className="font-display font-semibold text-lg text-foreground">Áudio</h3>
-                        <p className="text-sm text-muted-foreground">Extrair apenas o áudio</p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-3">
-                      {videoData.downloadOptions.audio.map((option: DownloadOption) => (
-                        <Button
-                          key={option.quality}
-                          variant="glass"
-                          onClick={() => handleDownload(option.quality, option.format)}
-                          disabled={isDownloading}
-                          className="w-full h-auto py-4 flex-col gap-1 hover:border-accent/50"
-                        >
-                          <span className="text-lg font-bold text-foreground">{option.quality}</span>
-                          <span className="text-xs text-muted-foreground">{option.format} • {option.estimatedSize}</span>
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Quick Actions */}
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <Button 
-                      variant="hero" 
-                      size="xl" 
-                      onClick={() => handleDownload("1080p", "MP4")} 
-                      disabled={isDownloading}
-                      className="flex-1"
-                    >
-                      {isDownloading ? (
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                      ) : (
-                        <Download className="w-5 h-5" />
+                  ) : downloadLinks && (downloadLinks.video.length > 0 || downloadLinks.audio.length > 0) ? (
+                    <>
+                      {/* Video Options with Direct Links */}
+                      {downloadLinks.video.length > 0 && (
+                        <div className="glass-card p-6">
+                          <div className="flex items-center gap-3 mb-4">
+                            <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
+                              <Download className="w-5 h-5 text-primary" />
+                            </div>
+                            <div>
+                              <h3 className="font-display font-semibold text-lg text-foreground">Vídeo</h3>
+                              <p className="text-sm text-muted-foreground">Clique para baixar diretamente</p>
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            {downloadLinks.video.map((link, index) => (
+                              <button
+                                key={index}
+                                onClick={() => handleDirectDownload(link.url, link.quality, link.format)}
+                                className="w-full flex items-center justify-between p-4 rounded-lg border border-border hover:border-primary/50 hover:bg-primary/5 transition-all group"
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                                    <Download className="w-5 h-5 text-primary" />
+                                  </div>
+                                  <div className="text-left">
+                                    <p className="font-semibold text-foreground">{link.quality} {link.format}</p>
+                                    <p className="text-xs text-muted-foreground">Vídeo com áudio</p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-muted-foreground">Baixar</span>
+                                  <Download className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
                       )}
-                      Melhor Qualidade (1080p)
-                    </Button>
-                    <Button 
-                      variant="glass" 
-                      size="xl" 
-                      onClick={() => handleDownload("320kbps", "MP3")} 
-                      disabled={isDownloading}
-                      className="flex-1"
-                    >
-                      {isDownloading ? (
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                      ) : (
-                        <Music className="w-5 h-5" />
+
+                      {/* Audio Options with Direct Links */}
+                      {downloadLinks.audio.length > 0 && (
+                        <div className="glass-card p-6">
+                          <div className="flex items-center gap-3 mb-4">
+                            <div className="w-10 h-10 rounded-xl bg-accent/20 flex items-center justify-center">
+                              <Music className="w-5 h-5 text-accent" />
+                            </div>
+                            <div>
+                              <h3 className="font-display font-semibold text-lg text-foreground">Áudio</h3>
+                              <p className="text-sm text-muted-foreground">Clique para baixar diretamente</p>
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            {downloadLinks.audio.map((link, index) => (
+                              <button
+                                key={index}
+                                onClick={() => handleDirectDownload(link.url, link.quality, link.format)}
+                                className="w-full flex items-center justify-between p-4 rounded-lg border border-border hover:border-accent/50 hover:bg-accent/5 transition-all group"
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center group-hover:bg-accent/20 transition-colors">
+                                    <Music className="w-5 h-5 text-accent" />
+                                  </div>
+                                  <div className="text-left">
+                                    <p className="font-semibold text-foreground">{link.quality} {link.format}</p>
+                                    <p className="text-xs text-muted-foreground">Apenas áudio</p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-muted-foreground">Baixar</span>
+                                  <Download className="w-4 h-4 text-muted-foreground group-hover:text-accent transition-colors" />
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
                       )}
-                      Extrair MP3
-                    </Button>
-                  </div>
+                    </>
+                  ) : (
+                    <>
+                      {/* Fallback: Show quality buttons that fetch on click */}
+                      <div className="glass-card p-6">
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
+                            <Download className="w-5 h-5 text-primary" />
+                          </div>
+                          <div>
+                            <h3 className="font-display font-semibold text-lg text-foreground">Vídeo</h3>
+                            <p className="text-sm text-muted-foreground">Download com áudio incluso</p>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                          {['1080p', '720p', '480p', '360p'].map((quality) => (
+                            <Button
+                              key={quality}
+                              variant="glass"
+                              onClick={() => handleFallbackDownload(quality, 'MP4')}
+                              className="w-full h-auto py-4 flex-col gap-1 hover:border-primary/50"
+                            >
+                              <span className="text-lg font-bold text-foreground">{quality}</span>
+                              <span className="text-xs text-muted-foreground">MP4</span>
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="glass-card p-6">
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="w-10 h-10 rounded-xl bg-accent/20 flex items-center justify-center">
+                            <Music className="w-5 h-5 text-accent" />
+                          </div>
+                          <div>
+                            <h3 className="font-display font-semibold text-lg text-foreground">Áudio</h3>
+                            <p className="text-sm text-muted-foreground">Extrair apenas o áudio</p>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-3 gap-3">
+                          {['320kbps', '192kbps', '128kbps'].map((quality) => (
+                            <Button
+                              key={quality}
+                              variant="glass"
+                              onClick={() => handleFallbackDownload(quality, 'MP3')}
+                              className="w-full h-auto py-4 flex-col gap-1 hover:border-accent/50"
+                            >
+                              <span className="text-lg font-bold text-foreground">{quality}</span>
+                              <span className="text-xs text-muted-foreground">MP3</span>
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
 
                   <div className="text-center">
                     <button onClick={handleReset} className="text-sm text-muted-foreground hover:text-foreground transition-colors underline underline-offset-4">
@@ -467,14 +513,6 @@ const Index = () => {
           </div>
         </footer>
       </div>
-
-      {/* Download Fallback Dialog */}
-      <DownloadFallbackDialog
-        open={showFallbackDialog}
-        onOpenChange={setShowFallbackDialog}
-        services={fallbackServices}
-        onSelectService={handleSelectFallbackService}
-      />
     </div>
   );
 };
