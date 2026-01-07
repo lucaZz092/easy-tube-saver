@@ -28,8 +28,10 @@ export interface DownloadInfo {
   format: string;
   type: 'audio' | 'video';
   message: string;
-  instructions: string[];
+  instructions?: string[];
   status: string;
+  downloadUrl?: string;
+  fallbackUrl?: string;
 }
 
 export interface ApiResponse<T> {

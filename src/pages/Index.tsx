@@ -3,6 +3,7 @@ import { Download, Music, Zap, Shield, Clock, Smartphone, Link, Clipboard, Loade
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { getVideoInfo, requestDownload, isValidYouTubeUrl, VideoInfo, DownloadOption } from "@/lib/api/youtube";
+import { downloadWithCobalt, getDownloadFallback } from "@/lib/api/cobalt";
 
 const features = [
   {
@@ -86,19 +87,55 @@ const Index = () => {
     
     setIsDownloading(true);
     
-    const response = await requestDownload(url, quality, format);
-
-    if (response.success && response.data) {
-      toast({ 
-        title: "Download pronto!", 
-        description: response.data.message,
-      });
-    } else {
-      toast({ 
-        title: "Erro no download", 
-        description: response.error || "Não foi possível processar o download.", 
-        variant: "destructive" 
-      });
+    try {
+      // Try cobalt.tools API first
+      const cobaltResponse = await downloadWithCobalt(url, quality, format);
+      
+      if (cobaltResponse.success && cobaltResponse.data?.downloadUrl) {
+        // Direct download available
+        toast({ 
+          title: "Download iniciado!", 
+          description: "O download será aberto em uma nova aba.",
+        });
+        
+        // Open download in new tab
+        window.open(cobaltResponse.data.downloadUrl, '_blank');
+      } else {
+        // Fallback to external service
+        const isAudio = format === 'MP3';
+        const fallbackUrl = getDownloadFallback(url, isAudio);
+        
+        toast({ 
+          title: "Redirecionando...", 
+          description: "Você será redirecionado para uma página externa para completar o download.",
+        });
+        
+        // Small delay to let user read the message
+        setTimeout(() => {
+          window.open(fallbackUrl, '_blank');
+        }, 1500);
+      }
+    } catch (error) {
+      console.error('Download error:', error);
+      
+      // Final fallback
+      const isAudio = format === 'MP3';
+      const fallbackUrl = getDownloadFallback(url, isAudio);
+      
+      const shouldOpen = window.confirm(
+        `Não foi possível processar o download diretamente.\n\n` +
+        `Deseja abrir uma página externa para fazer o download?`
+      );
+      
+      if (shouldOpen) {
+        window.open(fallbackUrl, '_blank');
+      } else {
+        toast({ 
+          title: "Download cancelado", 
+          description: "Você pode tentar novamente mais tarde.",
+          variant: "destructive"
+        });
+      }
     }
     
     setIsDownloading(false);

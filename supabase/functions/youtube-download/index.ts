@@ -56,31 +56,70 @@ serve(async (req) => {
 
     console.log('Processing download request:', { videoId, quality, format });
 
-    // For a production app, you would integrate with a service like:
-    // - cobalt.tools API
-    // - y2mate API
-    // - Custom server running yt-dlp
-    
-    // For demonstration, we'll return instructions and a fallback URL
-    // In production, you'd call an actual download service here
-    
     const isAudio = format === 'MP3';
+    const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
     
-    // Generate a redirect URL to a download service
-    // Note: These are example URLs - in production you'd use a real service
+    // Try to use cobalt.tools API
+    try {
+      const cobaltResponse = await fetch('https://api.cobalt.tools/api/json', {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          url: videoUrl,
+          vQuality: quality.replace('p', ''), // 1080p -> 1080
+          filenamePattern: 'basic',
+          isAudioOnly: isAudio,
+          aFormat: isAudio ? 'mp3' : undefined,
+        }),
+      });
+
+      if (cobaltResponse.ok) {
+        const cobaltData = await cobaltResponse.json();
+        
+        if (cobaltData.status === 'redirect' || cobaltData.status === 'stream') {
+          return new Response(
+            JSON.stringify({
+              success: true,
+              data: {
+                videoId,
+                quality,
+                format,
+                type: isAudio ? 'audio' : 'video',
+                downloadUrl: cobaltData.url,
+                message: 'Download pronto!',
+                status: 'ready',
+              },
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      }
+    } catch (cobaltError) {
+      console.error('Cobalt API error:', cobaltError);
+    }
+    
+    // Fallback: Use alternative services
+    const fallbackUrls = {
+      video: `https://www.y2mate.com/youtube/${videoId}`,
+      audio: `https://ytmp3.nu/5N2L/`,
+    };
+    
     const downloadInfo = {
       videoId,
       quality,
       format,
       type: isAudio ? 'audio' : 'video',
+      fallbackUrl: isAudio ? fallbackUrls.audio : fallbackUrls.video,
       message: `Preparando download ${format} ${quality}...`,
       instructions: [
-        '1. Clique no botão de download abaixo',
-        '2. Aguarde o processamento do vídeo',
-        '3. O download iniciará automaticamente',
+        '1. Será aberta uma página externa de download',
+        '2. Clique no botão de download/converter',
+        '3. Aguarde o processamento e faça o download',
       ],
-      // In production, generate actual download link here
-      status: 'ready',
+      status: 'redirect',
     };
 
     return new Response(

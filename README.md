@@ -1,22 +1,117 @@
-# Welcome to your Lovable project
+# Easy Tube Saver
 
-## Project info
+YouTube Video Downloader - Baixe vídeos e áudios do YouTube de forma fácil e rápida.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## 🚀 Funcionalidades
 
-## How can I edit this code?
+- ✅ Download de vídeos em múltiplas qualidades (1080p, 720p, 480p, 360p)
+- ✅ Extração de áudio para MP3 (320kbps, 192kbps, 128kbps)
+- ✅ Interface moderna e responsiva
+- ✅ Sem necessidade de cadastro
+- ✅ Totalmente gratuito
 
-There are several ways of editing your application.
+## 🛠️ Tecnologias
 
-**Use Lovable**
+- **Frontend:** React + TypeScript + Vite
+- **UI:** Tailwind CSS + shadcn/ui
+- **Backend:** Supabase Edge Functions
+- **Download:** Integração com cobalt.tools API
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+## 📦 Instalação
 
-Changes made via Lovable will be committed automatically to this repo.
+### Pré-requisitos
 
-**Use your preferred IDE**
+- Node.js 18+ ou Bun
+- Conta Supabase (gratuita)
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Passos
+
+1. Clone o repositório:
+```bash
+git clone https://github.com/lucaZz092/easy-tube-saver.git
+cd easy-tube-saver
+```
+
+2. Instale as dependências:
+```bash
+npm install
+# ou
+bun install
+```
+
+3. Configure as variáveis de ambiente:
+
+Crie um arquivo `.env` na raiz do projeto:
+```env
+VITE_SUPABASE_URL=sua_url_supabase
+VITE_SUPABASE_ANON_KEY=sua_chave_anonima
+```
+
+4. Inicie o servidor de desenvolvimento:
+```bash
+npm run dev
+# ou
+bun dev
+```
+
+O aplicativo estará disponível em `http://localhost:5173`
+
+## 🌐 Deploy das Edge Functions
+
+Para fazer o deploy das funções Supabase:
+
+```bash
+# Login no Supabase CLI
+supabase login
+
+# Link com seu projeto
+supabase link --project-ref SEU_PROJECT_REF
+
+# Deploy das funções
+supabase functions deploy youtube-info
+supabase functions deploy youtube-download
+```
+
+## 🖥️ Servidor de Download Local (Opcional)
+
+O aplicativo funciona usando APIs externas, mas você pode executar um servidor local para ter controle total dos downloads.
+
+Veja [server/README.md](server/README.md) para mais detalhes.
+
+## 📝 Como Usar
+
+1. Cole o link do vídeo do YouTube no campo de busca
+2. Clique em "Buscar" para carregar as informações do vídeo
+3. Escolha a qualidade desejada (vídeo ou áudio)
+4. Clique no botão de download
+5. O arquivo será baixado automaticamente
+
+## 🔒 Privacidade e Segurança
+
+- Não armazenamos nenhum dado pessoal
+- Não fazemos tracking de usuários
+- Todos os downloads são processados de forma segura
+- Código 100% open source
+
+## 📄 Licença
+
+MIT License - veja o arquivo [LICENSE](LICENSE) para mais detalhes.
+
+## ⚠️ Aviso Legal
+
+Esta ferramenta é apenas para uso educacional e pessoal. Respeite os direitos autorais e os termos de serviço do YouTube. Baixe apenas conteúdo que você tem permissão para baixar.
+
+## 🤝 Contribuindo
+
+Contribuições são bem-vindas! Sinta-se à vontade para abrir issues e pull requests.
+
+## 📧 Contato
+
+Para dúvidas ou sugestões, abra uma issue no GitHub.
+
+---
+
+Desenvolvido com ❤️ por [lucaZz092](https://github.com/lucaZz092)
 
 The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
 
@@ -62,12 +157,28 @@ This project is built with:
 
 ## How can I deploy this project?
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+### Deploy no Vercel
 
-## Can I connect a custom domain to my Lovable project?
+1. Faça push do código para o GitHub
+2. Conecte seu repositório no [Vercel](https://vercel.com)
+3. Configure as variáveis de ambiente
+4. Deploy automático!
 
-Yes, you can!
+### Deploy no Netlify
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+1. Faça push do código para o GitHub
+2. Conecte seu repositório no [Netlify](https://netlify.com)
+3. Configure:
+   - Build command: `npm run build`
+   - Publish directory: `dist`
+4. Adicione as variáveis de ambiente
+5. Deploy!
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+### Outras Opções
+
+- GitHub Pages
+- Cloudflare Pages
+- Railway
+- Render
+
+Qualquer serviço que suporte aplicações Vite/React pode ser usado.
