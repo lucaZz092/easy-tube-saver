@@ -3,6 +3,20 @@ import { ApiResponse, DownloadInfo } from './youtube';
 
 const COBALT_API_URL = 'https://api.cobalt.tools/api/json';
 
+// Multiple fallback services for better reliability
+const FALLBACK_SERVICES = {
+  video: [
+    { name: 'SaveFrom', url: (videoUrl: string) => `https://en.savefrom.net/#url=${encodeURIComponent(videoUrl)}` },
+    { name: '9xbuddy', url: (videoUrl: string) => `https://9xbuddy.org/process?url=${encodeURIComponent(videoUrl)}` },
+    { name: 'Y2Mate', url: (videoUrl: string) => `https://y2mate.com/youtube/${extractVideoId(videoUrl)}` },
+  ],
+  audio: [
+    { name: 'YTMP3', url: (videoUrl: string) => `https://ytmp3.cc/en2/${extractVideoId(videoUrl)}/` },
+    { name: 'MP3Juice', url: (videoUrl: string) => `https://mp3juices.cc/?q=${encodeURIComponent(videoUrl)}` },
+    { name: 'AudioDownloader', url: (videoUrl: string) => `https://320ytmp3.com/en/download?v=${extractVideoId(videoUrl)}` },
+  ],
+};
+
 export async function downloadWithCobalt(
   url: string,
   quality: string,
@@ -74,17 +88,20 @@ export async function downloadWithCobalt(
   }
 }
 
-// Fallback: Use y2mate or similar services
+// Get fallback download service URL
 export function getDownloadFallback(url: string, isAudio: boolean): string {
-  const videoId = extractVideoId(url);
-  
-  if (isAudio) {
-    // Audio download services
-    return `https://ytmp3.nu/5N2L/?url=${encodeURIComponent(url)}`;
-  } else {
-    // Video download services
-    return `https://www.y2mate.com/youtube/${videoId}`;
-  }
+  const services = isAudio ? FALLBACK_SERVICES.audio : FALLBACK_SERVICES.video;
+  // Return the first service (most reliable)
+  return services[0].url(url);
+}
+
+// Get all available fallback services
+export function getAllFallbackServices(url: string, isAudio: boolean) {
+  const services = isAudio ? FALLBACK_SERVICES.audio : FALLBACK_SERVICES.video;
+  return services.map(service => ({
+    name: service.name,
+    url: service.url(url),
+  }));
 }
 
 function extractVideoId(url: string): string | null {

@@ -3,7 +3,8 @@ import { Download, Music, Zap, Shield, Clock, Smartphone, Link, Clipboard, Loade
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { getVideoInfo, requestDownload, isValidYouTubeUrl, VideoInfo, DownloadOption } from "@/lib/api/youtube";
-import { downloadWithCobalt, getDownloadFallback } from "@/lib/api/cobalt";
+import { downloadWithCobalt, getDownloadFallback, getAllFallbackServices } from "@/lib/api/cobalt";
+import { DownloadFallbackDialog } from "@/components/DownloadFallbackDialog";
 
 const features = [
   {
@@ -44,6 +45,8 @@ const Index = () => {
   const [isDownloading, setIsDownloading] = useState(false);
   const [videoData, setVideoData] = useState<VideoInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showFallbackDialog, setShowFallbackDialog] = useState(false);
+  const [fallbackServices, setFallbackServices] = useState<Array<{ name: string; url: string }>>([]);
   const { toast } = useToast();
 
   const handlePaste = async () => {
@@ -101,44 +104,38 @@ const Index = () => {
         // Open download in new tab
         window.open(cobaltResponse.data.downloadUrl, '_blank');
       } else {
-        // Fallback to external service
+        // Fallback to external services - show dialog with options
         const isAudio = format === 'MP3';
-        const fallbackUrl = getDownloadFallback(url, isAudio);
+        const services = getAllFallbackServices(url, isAudio);
         
-        toast({ 
-          title: "Redirecionando...", 
-          description: "Você será redirecionado para uma página externa para completar o download.",
-        });
-        
-        // Small delay to let user read the message
-        setTimeout(() => {
-          window.open(fallbackUrl, '_blank');
-        }, 1500);
+        setFallbackServices(services);
+        setShowFallbackDialog(true);
       }
     } catch (error) {
       console.error('Download error:', error);
       
-      // Final fallback
+      // Show fallback options on error
       const isAudio = format === 'MP3';
-      const fallbackUrl = getDownloadFallback(url, isAudio);
+      const services = getAllFallbackServices(url, isAudio);
       
-      const shouldOpen = window.confirm(
-        `Não foi possível processar o download diretamente.\n\n` +
-        `Deseja abrir uma página externa para fazer o download?`
-      );
+      setFallbackServices(services);
+      setShowFallbackDialog(true);
       
-      if (shouldOpen) {
-        window.open(fallbackUrl, '_blank');
-      } else {
-        toast({ 
-          title: "Download cancelado", 
-          description: "Você pode tentar novamente mais tarde.",
-          variant: "destructive"
-        });
-      }
+      toast({ 
+        title: "Usando serviço alternativo", 
+        description: "Escolha um dos serviços disponíveis para fazer o download.",
+      });
     }
     
     setIsDownloading(false);
+  };
+
+  const handleSelectFallbackService = (serviceUrl: string) => {
+    window.open(serviceUrl, '_blank');
+    toast({ 
+      title: "Redirecionado!", 
+      description: "Siga as instruções na página para completar o download.",
+    });
   };
 
   const handleReset = () => {
@@ -470,6 +467,14 @@ const Index = () => {
           </div>
         </footer>
       </div>
+
+      {/* Download Fallback Dialog */}
+      <DownloadFallbackDialog
+        open={showFallbackDialog}
+        onOpenChange={setShowFallbackDialog}
+        services={fallbackServices}
+        onSelectService={handleSelectFallbackService}
+      />
     </div>
   );
 };
