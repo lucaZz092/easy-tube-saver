@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Download, Music, Zap, Shield, Clock, Smartphone, Link, Clipboard, Loader2, Play, Eye } from "lucide-react";
+import { Download, Music, Zap, Shield, Clock, Smartphone, Link, Clipboard, Loader2, Play, Eye, AlertCircle, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { getVideoInfo, requestDownload, isValidYouTubeUrl, VideoInfo, DownloadOption } from "@/lib/api/youtube";
 
 const features = [
   {
@@ -36,42 +37,19 @@ const features = [
   },
 ];
 
-const downloadOptions = [
-  { quality: "1080p", format: "MP4", size: "~250 MB", type: "video" },
-  { quality: "720p", format: "MP4", size: "~150 MB", type: "video" },
-  { quality: "480p", format: "MP4", size: "~80 MB", type: "video" },
-  { quality: "360p", format: "MP4", size: "~40 MB", type: "video" },
-  { quality: "320kbps", format: "MP3", size: "~10 MB", type: "audio" },
-  { quality: "128kbps", format: "MP3", size: "~4 MB", type: "audio" },
-];
-
-const extractVideoId = (url: string): string | null => {
-  const patterns = [
-    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
-  ];
-  for (const pattern of patterns) {
-    const match = url.match(pattern);
-    if (match) return match[1];
-  }
-  return null;
-};
-
 const Index = () => {
   const [url, setUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [videoData, setVideoData] = useState<{
-    id: string;
-    title: string;
-    thumbnail: string;
-    duration?: string;
-    views?: string;
-  } | null>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [videoData, setVideoData] = useState<VideoInfo | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
   const handlePaste = async () => {
     try {
       const text = await navigator.clipboard.readText();
       setUrl(text);
+      setError(null);
       toast({ title: "Link colado!", description: "O link foi colado com sucesso." });
     } catch {
       toast({ title: "Erro ao colar", description: "Não foi possível acessar a área de transferência.", variant: "destructive" });
@@ -80,34 +58,56 @@ const Index = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!url.includes("youtube.com") && !url.includes("youtu.be")) {
+    setError(null);
+    
+    if (!isValidYouTubeUrl(url)) {
+      setError("Por favor, insira um link válido do YouTube.");
       toast({ title: "Link inválido", description: "Por favor, insira um link válido do YouTube.", variant: "destructive" });
       return;
     }
 
     setIsLoading(true);
-    const videoId = extractVideoId(url);
+    
+    const response = await getVideoInfo(url);
 
-    if (videoId) {
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      setVideoData({
-        id: videoId,
-        title: "Vídeo do YouTube",
-        thumbnail: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
-        duration: "10:32",
-        views: "1.2M",
-      });
+    if (response.success && response.data) {
+      setVideoData(response.data);
+      toast({ title: "Vídeo encontrado!", description: response.data.title });
+    } else {
+      setError(response.error || "Não foi possível encontrar o vídeo.");
+      toast({ title: "Erro", description: response.error || "Não foi possível encontrar o vídeo.", variant: "destructive" });
     }
+    
     setIsLoading(false);
   };
 
-  const handleDownload = (quality: string, format: string) => {
-    toast({ title: "Download iniciado!", description: `Preparando ${format} ${quality}...` });
+  const handleDownload = async (quality: string, format: string) => {
+    if (!videoData) return;
+    
+    setIsDownloading(true);
+    
+    const response = await requestDownload(url, quality, format);
+
+    if (response.success && response.data) {
+      toast({ 
+        title: "Download pronto!", 
+        description: response.data.message,
+      });
+    } else {
+      toast({ 
+        title: "Erro no download", 
+        description: response.error || "Não foi possível processar o download.", 
+        variant: "destructive" 
+      });
+    }
+    
+    setIsDownloading(false);
   };
 
   const handleReset = () => {
     setVideoData(null);
     setUrl("");
+    setError(null);
   };
 
   return (
@@ -177,14 +177,17 @@ const Index = () => {
             </div>
 
             {/* URL Input */}
-            <form onSubmit={handleSubmit} className="w-full max-w-3xl mx-auto mb-16">
+            <form onSubmit={handleSubmit} className="w-full max-w-3xl mx-auto mb-8">
               <div className="glass-card p-2 flex items-center gap-2">
                 <div className="flex-1 flex items-center gap-3 px-4">
                   <Link className="w-5 h-5 text-muted-foreground" />
                   <input
                     type="url"
                     value={url}
-                    onChange={(e) => setUrl(e.target.value)}
+                    onChange={(e) => {
+                      setUrl(e.target.value);
+                      setError(null);
+                    }}
                     placeholder="Cole o link do vídeo do YouTube aqui..."
                     className="flex-1 bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground py-4 text-base"
                   />
@@ -198,33 +201,54 @@ const Index = () => {
               </div>
             </form>
 
+            {/* Error Message */}
+            {error && (
+              <div className="w-full max-w-3xl mx-auto mb-8">
+                <div className="flex items-center gap-2 text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-4 py-3">
+                  <AlertCircle className="w-5 h-5" />
+                  <span className="text-sm">{error}</span>
+                </div>
+              </div>
+            )}
+
             {/* Video Preview & Download Options */}
             {videoData && (
-              <div className="space-y-8 mb-20">
+              <div className="space-y-8 mb-20 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 {/* Video Preview */}
                 <div className="glass-card overflow-hidden max-w-2xl mx-auto">
                   <div className="relative group">
-                    <img src={videoData.thumbnail} alt={videoData.title} className="w-full aspect-video object-cover" />
+                    <img 
+                      src={videoData.thumbnail} 
+                      alt={videoData.title} 
+                      className="w-full aspect-video object-cover"
+                      onError={(e) => {
+                        e.currentTarget.src = videoData.thumbnailHQ;
+                      }}
+                    />
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <div className="w-16 h-16 rounded-full bg-primary/90 flex items-center justify-center">
+                      <a 
+                        href={videoData.watchUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="w-16 h-16 rounded-full bg-primary/90 flex items-center justify-center hover:scale-110 transition-transform"
+                      >
                         <Play className="w-8 h-8 text-primary-foreground fill-current ml-1" />
-                      </div>
+                      </a>
                     </div>
-                    {videoData.duration && (
-                      <div className="absolute bottom-3 right-3 bg-black/80 px-2 py-1 rounded text-xs font-medium text-white flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        {videoData.duration}
-                      </div>
-                    )}
                   </div>
                   <div className="p-5">
-                    <h3 className="font-display font-semibold text-lg text-foreground line-clamp-2 mb-2">{videoData.title}</h3>
-                    {videoData.views && (
-                      <div className="flex items-center gap-1 text-muted-foreground text-sm">
-                        <Eye className="w-4 h-4" />
-                        <span>{videoData.views} visualizações</span>
-                      </div>
-                    )}
+                    <h3 className="font-display font-semibold text-lg text-foreground line-clamp-2 mb-2">
+                      {videoData.title}
+                    </h3>
+                    <a 
+                      href={videoData.authorUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-muted-foreground text-sm hover:text-foreground transition-colors"
+                    >
+                      <Eye className="w-4 h-4" />
+                      <span>{videoData.author}</span>
+                    </a>
                   </div>
                 </div>
 
@@ -242,15 +266,16 @@ const Index = () => {
                       </div>
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      {downloadOptions.filter((o) => o.type === "video").map((option) => (
+                      {videoData.downloadOptions.video.map((option: DownloadOption) => (
                         <Button
                           key={option.quality}
                           variant="glass"
                           onClick={() => handleDownload(option.quality, option.format)}
+                          disabled={isDownloading}
                           className="w-full h-auto py-4 flex-col gap-1 hover:border-primary/50"
                         >
                           <span className="text-lg font-bold text-foreground">{option.quality}</span>
-                          <span className="text-xs text-muted-foreground">{option.format} • {option.size}</span>
+                          <span className="text-xs text-muted-foreground">{option.format} • {option.estimatedSize}</span>
                         </Button>
                       ))}
                     </div>
@@ -267,16 +292,17 @@ const Index = () => {
                         <p className="text-sm text-muted-foreground">Extrair apenas o áudio</p>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      {downloadOptions.filter((o) => o.type === "audio").map((option) => (
+                    <div className="grid grid-cols-3 gap-3">
+                      {videoData.downloadOptions.audio.map((option: DownloadOption) => (
                         <Button
                           key={option.quality}
                           variant="glass"
                           onClick={() => handleDownload(option.quality, option.format)}
+                          disabled={isDownloading}
                           className="w-full h-auto py-4 flex-col gap-1 hover:border-accent/50"
                         >
                           <span className="text-lg font-bold text-foreground">{option.quality}</span>
-                          <span className="text-xs text-muted-foreground">{option.format} • {option.size}</span>
+                          <span className="text-xs text-muted-foreground">{option.format} • {option.estimatedSize}</span>
                         </Button>
                       ))}
                     </div>
@@ -284,12 +310,32 @@ const Index = () => {
 
                   {/* Quick Actions */}
                   <div className="flex flex-col sm:flex-row gap-3">
-                    <Button variant="hero" size="xl" onClick={() => handleDownload("1080p", "MP4")} className="flex-1">
-                      <Download className="w-5 h-5" />
+                    <Button 
+                      variant="hero" 
+                      size="xl" 
+                      onClick={() => handleDownload("1080p", "MP4")} 
+                      disabled={isDownloading}
+                      className="flex-1"
+                    >
+                      {isDownloading ? (
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                      ) : (
+                        <Download className="w-5 h-5" />
+                      )}
                       Melhor Qualidade (1080p)
                     </Button>
-                    <Button variant="glass" size="xl" onClick={() => handleDownload("320kbps", "MP3")} className="flex-1">
-                      <Music className="w-5 h-5" />
+                    <Button 
+                      variant="glass" 
+                      size="xl" 
+                      onClick={() => handleDownload("320kbps", "MP3")} 
+                      disabled={isDownloading}
+                      className="flex-1"
+                    >
+                      {isDownloading ? (
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                      ) : (
+                        <Music className="w-5 h-5" />
+                      )}
                       Extrair MP3
                     </Button>
                   </div>
@@ -327,6 +373,34 @@ const Index = () => {
               </div>
             </section>
 
+            {/* How it Works Section */}
+            <section className="py-16">
+              <div className="text-center mb-12">
+                <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4">
+                  Como Funciona?
+                </h2>
+                <p className="text-muted-foreground max-w-xl mx-auto">
+                  Em apenas 3 passos simples você baixa qualquer vídeo
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
+                {[
+                  { step: "1", title: "Cole o Link", desc: "Copie o link do vídeo do YouTube e cole no campo acima" },
+                  { step: "2", title: "Escolha a Qualidade", desc: "Selecione a qualidade de vídeo ou áudio desejada" },
+                  { step: "3", title: "Baixe", desc: "Clique no botão e o download começará automaticamente" },
+                ].map((item, index) => (
+                  <div key={index} className="text-center">
+                    <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center mx-auto mb-4 text-2xl font-bold text-primary-foreground">
+                      {item.step}
+                    </div>
+                    <h3 className="font-display font-semibold text-lg text-foreground mb-2">{item.title}</h3>
+                    <p className="text-muted-foreground text-sm">{item.desc}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+
             {/* FAQ Section */}
             <section id="faq" className="py-16">
               <div className="text-center mb-12">
@@ -339,6 +413,7 @@ const Index = () => {
                   { q: "Qual a qualidade máxima disponível?", a: "Você pode baixar vídeos em até 1080p (Full HD) e áudios em 320kbps." },
                   { q: "Funciona no celular?", a: "Sim! O site é totalmente responsivo e funciona em qualquer dispositivo." },
                   { q: "É seguro usar?", a: "Completamente seguro. Não armazenamos dados e não há riscos de vírus." },
+                  { q: "Preciso criar conta?", a: "Não! Você pode usar o TubeDown sem nenhum cadastro ou login." },
                 ].map((faq, index) => (
                   <div key={index} className="glass-card p-6">
                     <h3 className="font-display font-semibold text-foreground mb-2">{faq.q}</h3>
